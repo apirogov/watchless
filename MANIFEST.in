@@ -1,0 +1,4 @@
+# The sdist carries the package, not the benchmark harness. The corpus it runs
+# against is third-party video captions, recorded for prompt tuning and not
+# redistributed.
+prune tests

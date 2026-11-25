@@ -1,0 +1,164 @@
+[build-system]
+# Setuptools is the backend the config at the bottom of this file is written
+# against (packages.find, package-dir, package-data, dynamic version).
+#
+# The table is not optional. Without it uv builds anyway -- `uv build` and
+# `uv tool install .` both fall back to "legacy setuptools" and produce a valid
+# wheel with the console script. What breaks is `uv sync`: the project is
+# treated as unpackaged, so it is never installed into the venv and
+# `import watchless` fails, with no error to say why. `uv run` has nothing to
+# run. Naming the backend makes the project installable rather than merely
+# buildable.
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "watchless"
+# Read from the module, not restated: __version__ drove --version while this
+# line drove the wheel, so the rename left one at 4.0.0 and the other at 0.1.0.
+dynamic = ["version"]
+description = "YouTube URL to a readable Markdown transcript, with an optional LLM summary that reports its evidence"
+readme = "README.md"
+requires-python = ">=3.11"
+# SPDX expression + explicit license-files, not the { file = ... } table: that
+# form is deprecated (deadline 2027) and so is the matching license classifier,
+# which is why there is none in the classifier list below.
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Anton Pirogov", email = "apirogov@users.noreply.github.com" }]
+keywords = [
+    "youtube",
+    "transcript",
+    "subtitles",
+    "captions",
+    "markdown",
+    "summarization",
+    "llm",
+    "yt-dlp",
+    "cli",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Text Processing :: Markup :: Markdown",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    # The only backend: transcripts, and the title/channel/description/language
+    # metadata. Imported as a library, not invoked as a binary.
+    "yt-dlp>=2024.1.1",
+]
+
+[project.scripts]
+watchless = "watchless.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/apirogov/watchless"
+Source = "https://github.com/apirogov/watchless"
+Issues = "https://github.com/apirogov/watchless/issues"
+Changelog = "https://github.com/apirogov/watchless/commits/main"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.11",
+    "ruff>=0.6",
+    "pytest>=8.0",
+]
+
+# ---------------------------------------------------------------------------
+# Tooling
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "BLE",  # flake8-blind-except (every broad except must be justified)
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "RET",  # flake8-return
+    "PTH",  # flake8-use-pathlib
+    "TID",  # flake8-tidy-imports (bans relative imports)
+    "ARG",  # unused arguments
+    "PL",   # pylint subset
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "PLR0913",  # too many arguments -- dataclasses keep the call sites honest
+    "PLR2004",  # magic value comparisons -- mostly [:10] display truncation
+    "RUF001",   # ambiguous unicode in strings: en/em dashes are intentional
+    "RUF002",
+    "RUF003",
+    "PLR0911",  # too many returns: the dispatchers are clearer as early-outs
+    "PLR0917",  # too many positional args: keyword-only where it matters
+    # Deliberately NOT ignored: PLR0912 (branches) and PLR0915 (statements).
+    # They were, and they were covering the corpus runner's single 102-statement
+    # function. An ignore that hides a known-bad shape is how the shape survives.
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test functions legitimately take fixtures they do not use, and PLR limits do
+# not fit parametrised cases. Bench code under tests/bench/ is real code and
+# gets no such relief -- the glob is deliberately tests/test_*.py, not tests/*,
+# so moving a module under tests/bench/ cannot quietly exempt it from lint.
+"tests/test_*.py" = ["ARG", "PLR"]
+"tests/bench/*.py" = ["ARG"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+no_implicit_optional = true
+show_error_codes = true
+pretty = true
+
+# yt-dlp ships no stubs and there is no types-yt-dlp on PyPI, so there is
+# nothing to type against.
+[[tool.mypy.overrides]]
+module = ["yt_dlp"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# The prompts are .md data beside the module, so they must be declared as
+# package data -- without this the wheel builds fine and then fails at the first
+# summarize, because the file is not inside it.
+[tool.setuptools.dynamic]
+version = { attr = "watchless.__version__" }
+
+[tool.setuptools.package-data]
+# Without this marker pip treats the package as untyped and ignores the
+# annotations, making the "Typing :: Typed" classifier above untrue.
+"watchless" = ["py.typed"]
+"watchless.prompts" = ["*.md"]
+
+# A bash script copied to ~/bin. Shipped so `--install-termux-opener` works
+# from an install with no checkout to copy from.
+"watchless.data" = ["termux-url-opener"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"

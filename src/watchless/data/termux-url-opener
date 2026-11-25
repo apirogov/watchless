@@ -1,0 +1,164 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# ~/bin/termux-url-opener
+#
+# HOW THIS GETS CALLED:
+#   The Termux app registers an ACTION_SEND receiver for text/plain. Sharing a
+#   link and picking Termux makes that receiver take android.intent.extra.TEXT
+#   and exec the fixed path $HOME/bin/termux-url-opener with it as $1. The path
+#   is compiled into the app; nothing scans PATH.
+#
+# OUTPUT VISIBILITY:
+#   The receiver attaches no terminal, so anything printed here is discarded and
+#   you see a blank window that closes when the work finishes. Progress is made
+#   visible by re-executing in a real Termux session (relaunch_visible).
+set -uo pipefail
+
+URL="${1:-}"
+if [ -z "$URL" ]; then
+    echo "no URL given"
+    exit 1
+fi
+
+SELF="$HOME/bin/termux-url-opener"
+
+# ---------------------------------------------------------------------------
+# Which watchless?
+#
+# `uv tool install` puts the console script in ~/.local/bin, which is on PATH in
+# an interactive Termux session but not always in a non-login Android shell, so
+# that directory is checked explicitly. A bare python3 usually has no package
+# installed, hence the import probe last.
+# ---------------------------------------------------------------------------
+resolve_cmd() {
+    if command -v watchless >/dev/null 2>&1; then
+        CMD=(watchless)
+    elif [ -x "$HOME/.local/bin/watchless" ]; then
+        CMD=("$HOME/.local/bin/watchless")
+    elif python3 -c 'import watchless' >/dev/null 2>&1; then
+        CMD=(python3 -m watchless.cli)
+    else
+        CMD=()
+    fi
+}
+CMD=()
+
+# ---------------------------------------------------------------------------
+# Make progress visible.
+#
+# termux-am starts our own activity with a real terminal. TERMUX_HANDOFF guards
+# against a relaunch loop.
+# ---------------------------------------------------------------------------
+relaunch_visible() {
+    [ -n "${TERMUX_HANDOFF:-}" ] && return 1     # already the visible copy
+    command -v termux-am >/dev/null 2>&1 || return 1
+
+    local script="$SELF" url="$URL" inner
+    inner=$(printf 'TERMUX_HANDOFF=1 bash %q %q; s=$?; echo; echo "[exit $s - press Enter]"; read -r _' \
+            "$script" "$url")
+
+    # --esa splits on commas, so a comma in the URL or path would shear the
+    # argument list. %q never emits a bare comma, so the only risk is the URL.
+    termux-am start \
+        --es com.termux.RUN_COMMAND_PATH /data/data/com.termux/files/usr/bin/bash \
+        --esa com.termux.RUN_COMMAND_ARGUMENTS "-c,${inner}" \
+        --ez com.termux.RUN_COMMAND_BACKGROUND false >/dev/null 2>&1 && return 0
+    # Older Termux without --ez.
+    termux-am start \
+        --es com.termux.RUN_COMMAND_PATH /data/data/com.termux/files/usr/bin/bash \
+        --esa com.termux.RUN_COMMAND_ARGUMENTS "-c,${inner}" >/dev/null 2>&1 && return 0
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# Config. watchless reads these as ENV VARS, so they have to be EXPORTED: a plain
+# assignment in a sourced file stays a shell variable and the child never sees
+# it.
+#
+# `set -a` exports whatever the sourced file defines. A hand-maintained list of
+# names would silently miss any WATCHLESS_* added to it later.
+# ---------------------------------------------------------------------------
+if [ -f "$HOME/.config/watchless.env" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    . "$HOME/.config/watchless.env"
+    set +a
+fi
+
+# Resolved after the env file, so a WATCHLESS_DEST set there wins.
+DEST="${WATCHLESS_DEST:-$HOME/storage/shared/Documents/transcripts}"
+
+BULLETS="${WATCHLESS_BULLETS:-}"
+SLUG_OVERRIDE="${WATCHLESS_SLUG_OVERRIDE:-}"
+
+notify() {  # best-effort; silently skipped without the Termux:API app
+    command -v termux-toast >/dev/null 2>&1 && termux-toast -s "$1"
+    echo "$1"
+}
+
+case "$URL" in
+    *youtube.com*|*youtu.be*|*youtube-nocookie.com*) ;;
+    *)
+        notify "not a YouTube link - opening in browser"
+        command -v termux-open-url >/dev/null 2>&1 && termux-open-url "$URL" \
+            || echo "open this yourself: $URL"
+        exit 0
+        ;;
+esac
+
+resolve_cmd
+if [ "${#CMD[@]}" -eq 0 ]; then
+    notify "watchless not found (run: cd ~/watchless && uv tool install -e .)"
+    exit 1
+fi
+
+# From the share sheet: hand off to a visible session and return immediately.
+if relaunch_visible; then
+    notify "running in a Termux session..."
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Below runs in a VISIBLE terminal (or a plain shell if termux-am is absent).
+# Output is streamed, not captured, so progress is watchable.
+# ---------------------------------------------------------------------------
+args=()
+[ -n "$BULLETS" ] && args+=(--bullets "$BULLETS")
+if [ -n "$SLUG_OVERRIDE" ]; then
+    if [ "$SLUG_OVERRIDE" = "1" ]; then args+=(--slug); else args+=(--no-slug); fi
+fi
+
+echo "watchless: $URL"
+echo "dest:   $DEST"
+echo
+
+# Tee so the run is visible live AND the written path can be read off the end.
+out=$(mktemp "${TMPDIR:-/tmp}/watchless.XXXXXX")
+trap 'rm -f "$out"' EXIT
+
+"${CMD[@]}" "$URL" --out-dir "$DEST" "${args[@]}" 2>&1 | tee "$out"
+rc=${PIPESTATUS[0]}
+
+echo
+if [ "$rc" -eq 0 ]; then
+    # Anchor on the last line: the CLI's contract is that stdout carries only
+    # the path when a file is written. The ls fallback covers --no-header and
+    # any future change to that contract.
+    file=$(tail -1 "$out")
+    case "$file" in
+        *.txt) [ -f "$file" ] || file="" ;;
+        *) file="" ;;
+    esac
+    [ -z "$file" ] && file=$(ls -t "$DEST"/*.txt 2>/dev/null | head -1)
+    notify "transcript ready: $(basename "${file:-?}")"
+    if [ -n "$file" ] && [ -f "$file" ] && command -v termux-open >/dev/null 2>&1; then
+        termux-open "$file"
+    fi
+elif [ "$rc" -eq 3 ]; then
+    notify "YouTube is blocking this IP - not a script error."
+elif [ "$rc" -eq 4 ]; then
+    notify "summary required but no endpoint configured."
+else
+    notify "failed (rc=$rc)"
+fi
+
+exit "$rc"

@@ -1,0 +1,112 @@
+{
+  "explainer-science": {
+    "url": "https://www.youtube.com/watch?v=lXfEK8G8CUI",
+    "title": "How The Immune System ACTUALLY Works \u2013 IMMUNE",
+    "note": "How The Immune System ACTUALLY Works \u2013 IMMUNE [10:48]",
+    "duration_s": 648
+  },
+  "howto-hardware": {
+    "url": "https://www.youtube.com/watch?v=VtIWN5SJDYo",
+    "title": "How to control RGB WS2812B  LED 32x8 matrix with an Arduino - Tutorial",
+    "note": "How to control RGB WS2812B  LED 32x8 matrix with an Arduino - Tutorial [7:23]",
+    "duration_s": 443
+  },
+  "howto-software": {
+    "url": "https://www.youtube.com/watch?v=f1wnYdLEpgI",
+    "title": "Learn Git Rebase in 6 minutes // explained with live animations!",
+    "note": "Learn Git Rebase in 6 minutes // explained with live animations! [6:42]",
+    "duration_s": 402
+  },
+  "opinion-argument": {
+    "url": "https://www.youtube.com/watch?v=8cF442d-EdQ",
+    "title": "Is Remote Work Better Than Being in the Office? It's Complicated | Mark Mortensen | TED",
+    "note": "Is Remote Work Better Than Being in the Office? It's Complicated | Mark Mortensen | TED [7:26]",
+    "duration_s": 446
+  },
+  "health-claim": {
+    "url": "https://www.youtube.com/watch?v=hrqr3IIoTOs",
+    "title": "VITAMIN D IS DANGEROUS",
+    "note": "VITAMIN D IS DANGEROUS [6:06]",
+    "duration_s": 366
+  },
+  "interview-long": {
+    "url": "https://www.youtube.com/watch?v=IUIZ6dm1vRc",
+    "title": "Mechanical Engineering Talk with Colin Brook (Long-Form)",
+    "note": "Mechanical Engineering Talk with Colin Brook (Long-Form) [24:24]",
+    "duration_s": 1464
+  },
+  "personal-vlog": {
+    "url": "https://www.youtube.com/watch?v=Q3p7iBOAey4",
+    "title": "First Time in Georgia \ud83c\uddec\ud83c\uddea | 4 Day Itinerary in Tbilisi",
+    "note": "First Time in Georgia \ud83c\uddec\ud83c\uddea | 4 Day Itinerary in Tbilisi",
+    "replaced": "https://www.youtube.com/watch?v=t61V427wH_Y",
+    "reason": "caption fetch 429 (Google automated-queries flag)"
+  },
+  "comedy-satire": {
+    "url": "https://www.youtube.com/watch?v=Kuqrj8uBZ5U",
+    "title": "Best Stand up comedy sketch ever!",
+    "note": "Best Stand up comedy sketch ever!",
+    "replaced": "https://www.youtube.com/watch?v=M4Rr4l5mAug",
+    "reason": "caption fetch 429 (Google automated-queries flag)"
+  },
+  "making-of": {
+    "url": "https://www.youtube.com/watch?v=8GhKOHGvVyU",
+    "title": "How I made this Airbnb Mockommercial in Blender (Behind the scene)",
+    "note": "How I made this Airbnb Mockommercial in Blender (Behind the scene) [3:24]",
+    "duration_s": 204
+  },
+  "review-hardware": {
+    "url": "https://www.youtube.com/watch?v=lDCybjkNAFk",
+    "title": "I Tried 70 Keyboards Last Year... (So You Don't Have to)",
+    "note": "I Tried 70 Keyboards Last Year... (So You Don't Have to) [15:45]",
+    "duration_s": 945
+  },
+  "news-commentary": {
+    "url": "https://www.youtube.com/watch?v=xmCPf8l_4-U",
+    "title": "Do Presidential Debates Change Elections? : 'This Week' Panel Discussion",
+    "note": "Do Presidential Debates Change Elections? : 'This Week' Panel Discussion [19:48]",
+    "duration_s": 1188
+  },
+  "craft-showcase": {
+    "url": "https://www.youtube.com/watch?v=9uAk7vOExUA",
+    "title": "Are These Mug Molds Worth It? - Here is What I Found!",
+    "note": "Are These Mug Molds Worth It? - Here is What I Found! [13:06]",
+    "duration_s": 786
+  },
+  "german-language": {
+    "url": "https://www.youtube.com/watch?v=KAgC9iVLHh4",
+    "title": "Eine kurze Geschichte der Technik [Ganze Doku] | Harald Lesch | Terra X: Faszination Universum",
+    "note": "Eine kurze Geschichte der Technik [Ganze Doku] | Harald Lesch | Terra X: Faszination Universum [43:55]",
+    "duration_s": 2635
+  },
+  "recipe-cooking": {
+    "url": "https://www.youtube.com/watch?v=KWqiKfN_Lw4",
+    "title": "Thanksgiving Dinner Made From Scratch",
+    "note": "Thanksgiving Dinner Made From Scratch [28:26]",
+    "duration_s": 1706
+  },
+  "game-analysis": {
+    "url": "https://www.youtube.com/watch?v=iIOIT3dCy5w",
+    "title": "How To Think Like A Game Designer",
+    "note": "How To Think Like A Game Designer [13:06]",
+    "duration_s": 786
+  },
+  "asmr-unboxing": {
+    "url": "https://www.youtube.com/watch?v=Y35B3F-vj0M",
+    "title": "Unintentional ASMR - Amazon Unboxing (iphone audio no talking)",
+    "note": "Unintentional ASMR - Amazon Unboxing (iphone audio no talking) [15:13]",
+    "duration_s": 913
+  },
+  "silent-craft": {
+    "url": "https://www.youtube.com/watch?v=LX-kcOcNez8",
+    "title": "ASMR Wood Carving - No Talking ASMR Relaxation",
+    "note": "ASMR Wood Carving - No Talking ASMR Relaxation [38:51]",
+    "duration_s": 2331
+  },
+  "build-log": {
+    "url": "https://www.youtube.com/watch?v=hKF0fS-PIf4",
+    "title": "TIMELAPSE - Young Man Gets Laid off and Builds Tiny House CABIN from scratch.",
+    "note": "TIMELAPSE - Young Man Gets Laid off and Builds Tiny House CABIN from scratch. [23:52]",
+    "duration_s": 1432
+  }
+}

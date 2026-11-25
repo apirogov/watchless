@@ -1,0 +1,37 @@
+# --- build / tooling -------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# tool caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- project runtime output ------------------------------------------------
+# NOTE: the corpus transcripts under tests/bench/corpus/*.md are deliberately
+# COMMITTED. They are the evidence behind the prompt iterations and cost real
+# YouTube requests against a rate-limited IP; they are expensive to regenerate,
+# not disposable. The intermediate downloads and per-run noise are not.
+tests/bench/corpus/_raw/
+tests/bench/corpus/*.log
+tests/bench/corpus/resolved.json
+tests/bench/corpus/REPORT.md
+*.log
+
+# --- secrets / local config -------------------------------------------------
+.env
+*api_key*
+auth*.json
+
+# --- editors ---------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
