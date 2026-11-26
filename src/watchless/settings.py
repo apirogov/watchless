@@ -18,7 +18,13 @@ from pathlib import Path
 # Declared once. Everything that needs a default imports it from here.
 TIMEOUT_S = 300  # local models on weak hardware are slow
 RETRIES = 0  # attempts beyond the first; the timeout applies to each
-DEFAULT_MAX_CHARS = 24_000  # ~6k tokens; trimmed from the middle if longer
+# Character budget for the transcript sent to the model. Used only when the
+# endpoint does not advertise a context window: when it does, the budget is half
+# of it, because a prompt is input + output and summarising should not consume
+# the whole window.
+DEFAULT_MAX_CHARS = 24_000
+CONTEXT_FRACTION = 0.5  # of the model's context window
+CHARS_PER_TOKEN = 4  # rough, and deliberately conservative
 DEFAULT_MAX_BULLETS = 12
 # Budget shaping. A fixed bullet ceiling compresses a 3,800-word transcript far
 # harder than a 570-word one: measured over the corpus, five files sat at the
@@ -28,8 +34,14 @@ DEFAULT_MAX_BULLETS = 12
 # worst-case short-file ratio is 27%, at 6 it is 41%, which is worse than the
 # uncapped behaviour it replaces.
 SUMMARY_TARGET_RATIO = 0.10  # of transcript words
-SUMMARY_WORDS_PER_BULLET = 31  # measured median over 122 corpus bullets
+SUMMARY_WORDS_PER_BULLET = 31  # measured median over 112 corpus bullets
 SUMMARY_FLOOR_BULLETS = 4
+# Ceiling on the word budget, per bullet. Without it the ratio alone let a 26k
+# word transcript ask for 2,700 words while 85% of it had been trimmed away:
+# the model wrote an essay about a document it had not been shown. Measured
+# corpus bullets run 30 words at the median, 38 at p90, 48 at most, so 40 leaves
+# room for a long bullet and stops the budget growing with transcript length.
+SUMMARY_MAX_WORDS_PER_BULLET = 40
 # Distinct from DEFAULT_MAX_BULLETS: the prompt's --bullets is the count to ask
 # for; this is the ceiling before working memory is considered.
 MAX_BULLETS = DEFAULT_MAX_BULLETS

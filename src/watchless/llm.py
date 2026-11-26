@@ -195,6 +195,45 @@ def probe_models(
     return [i["id"] for i in items if isinstance(i, dict) and "id" in i], info
 
 
+def context_limit(
+    model: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    timeout: int = 10,
+) -> int | None:
+    """The model's context window in tokens, or None when the server omits it.
+
+    Served under ``max_model_len`` (vLLM-style), ``context_length``, or nested in
+    ``metadata.limits.max_context_length``. Anything else is a server we know
+    nothing about, and the caller falls back to its own default.
+    """
+    url, key = _endpoint(base_url, api_key)
+    root = url.rsplit("/chat/completions", 1)[0]
+    req = urllib.request.Request(f"{root}/models", method="GET")
+    if key:
+        req.add_header("Authorization", f"Bearer {key}")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = json.loads(r.read().decode("utf-8", "replace"))
+    except Exception:  # noqa: BLE001  a missing limit is not an error
+        return None
+    items = data.get("data") if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        return None
+    for item in items:
+        if not isinstance(item, dict) or (model and item.get("id") != model):
+            continue
+        for value in (
+            item.get("max_model_len"),
+            item.get("context_length"),
+            item.get("context_window"),
+            (item.get("metadata") or {}).get("limits", {}).get("max_context_length"),
+        ):
+            if isinstance(value, int) and value > 0:
+                return value
+    return None
+
+
 def list_models(
     base_url: str | None = None,
     api_key: str | None = None,
@@ -409,10 +448,12 @@ def _post_once(
 def _extract_content(raw: str, url: str = "") -> str:
     """Pull the assistant text out of a chat-completions response.
 
-    Handles the three shapes seen in the wild:
+    Handles the shapes seen in the wild:
       content: str                      (standard)
       content: [{type: text, text: ..}] (content parts)
-      content: null + reasoning_content (reasoning models)
+      content: null + reasoning         (reasoning models; the field is
+                                         ``reasoning`` on some servers and
+                                         ``reasoning_content`` on others)
     """
     try:
         data = json.loads(raw)
@@ -429,7 +470,7 @@ def _extract_content(raw: str, url: str = "") -> str:
             p.get("text", "") if isinstance(p, dict) else str(p) for p in content
         )
     if not content:
-        content = msg.get("reasoning_content") or ""
+        content = msg.get("reasoning_content") or msg.get("reasoning") or ""
     if not isinstance(content, str) or not content.strip():
         raise SummarizeError(f"empty assistant message from {url}")
 

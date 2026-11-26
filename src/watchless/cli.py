@@ -246,7 +246,6 @@ def _doctor_resolved(
     print(f"  key        {'***set***' if llm_key else '-'}")
     print(
         f"  timeout    {args.llm_timeout}s   bullets {args.bullets}   "
-        f"max_chars {args.max_chars}"
     )
     print()
     print("features:")
@@ -474,14 +473,6 @@ def build_parser() -> argparse.ArgumentParser:
         "applies to each (default 0)",
     )
     group.add_argument(
-        "--max-chars",
-        type=int,
-        default=settings.DEFAULT_MAX_CHARS,
-        metavar="N",
-        help="trim transcripts longer than N chars before "
-        "sending (head+tail kept; default 24000)",
-    )
-    group.add_argument(
         "--summary",
         action="store_true",
         help="require a summary: warn loudly and exit non-zero "
@@ -635,7 +626,6 @@ def _summarize_or_degrade(
             api_key=llm_key,
             model=llm_model,
             max_bullets=args.bullets,
-            max_chars=args.max_chars,
             timeout=args.llm_timeout,
             retries=args.llm_retries,
             title=video.title,

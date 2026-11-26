@@ -79,19 +79,14 @@ def _kind_from(log_path: Path) -> str:
         return "-"
 
 
-# yt-dlp ships no stubs (no .pyi, no py.typed as of 2026.11).
+# yt-dlp ships no stubs, so its option dict has no upstream type to borrow.
 Options = dict[str, Any]
 
-# Development only: this is a benchmark harness, not a command users run. It is
-# not registered in [project.scripts] and never installed onto PATH, and it now
-# lives under tests/ because it is test logic, not something the tool ships.
-# Run it from the checkout with `uv run python -m tests.bench.corpus`.
+# Run from the checkout: `uv run python -m tests.bench.corpus`.
 #
-# The data sits in tests/bench/corpus/ rather than a top-level corpus/ so the
-# checkout has one place for testing. The directory is located from __file__,
-# upward to the checkout root, rather than by walking for pyproject.toml: this
-# file is already inside the tree at a known depth, so a wrong path here would
-# silently create an empty corpus/ elsewhere and every bucket would look missing.
+# The directory is located from __file__ rather than by walking upward for
+# pyproject.toml: a wrong path would silently create an empty corpus/ elsewhere
+# and every bucket would look missing.
 _HERE = Path(__file__).resolve().parent  # .../tests/bench
 OUT = _HERE / "corpus"
 if not OUT.is_dir():  # pragma: no cover - guards a silent, confusing failure
@@ -229,6 +224,13 @@ VIDEOS: list[VideoEntry] = [
         "both",
         "the second both-branch; 13-making-of was the only one",
         "ytsearch5:build log from scratch timelapse construction diary",
+    ),
+    (
+        "panel-entertainment",
+        "B",
+        "CASE B: multi-host panel banter, 45min, de; nothing to extract, and at "
+        "156k chars it is the largest transcript in the corpus by 4x",
+        "https://www.youtube.com/watch?v=e9Vv5GrSGx0",
     ),
 ]
 

@@ -10,8 +10,10 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, ClassVar
+from unittest import mock
 
 from watchless import llm
+from watchless import settings as St
 from watchless import summarize as S
 
 LAST: dict[str, Any] = {}
@@ -298,19 +300,52 @@ class TestMetadataLines(unittest.TestCase):
         self.assertEqual(S.normalize_bullets("- a\n- b"), "- a\n- b")
 
 
-class TestTrim(Base):
-    def test_short_untouched(self) -> None:
-        txt, trimmed = S.trim("hello", 24000)
-        self.assertFalse(trimmed)
-        self.assertEqual(txt, "hello")
+class TestBudgetChars(Base):
+    """The transcript budget comes from the endpoint, not a fixed constant."""
 
-    def test_long_keeps_head_and_tail(self) -> None:
-        txt, trimmed = S.trim("A" * 2000 + "MIDDLE" * 100 + "Z" * 2000, 1000)
-        self.assertTrue(trimmed)
-        self.assertTrue(txt.startswith("A"))
-        self.assertTrue(txt.endswith("Z"))
-        self.assertIn("omitted", txt)
-        self.assertNotIn("MIDDLE", txt)
+    def test_half_the_context_window(self) -> None:
+        # 1,048,560-token window -> ~524k tokens -> 4 chars each
+        self.assertEqual(S.budget_chars(1_048_560), 524_280 * 4)
+
+    def test_unknown_context_falls_back_to_the_constant(self) -> None:
+        self.assertEqual(S.budget_chars(None), St.DEFAULT_MAX_CHARS)
+
+    def test_zero_context_is_treated_as_unknown(self) -> None:
+        self.assertEqual(S.budget_chars(0), St.DEFAULT_MAX_CHARS)
+
+
+class TestRefusesRatherThanTruncates(Base):
+    """An over-budget transcript is refused before anything is sent.
+
+    Cutting a hole in the middle made the model write about a document it had
+    not been shown, and report the hole as a defect in the video's captions.
+    """
+
+    def test_over_budget_raises(self) -> None:
+        with self.assertRaises(S.TranscriptTooLong):
+            S.build_prompt("x" * 200_000, 12, budget=24_000)
+
+    def test_nothing_is_sent_when_it_does_not_fit(self) -> None:
+        sent: list[object] = []
+        original = llm.call
+        llm.call = lambda *a, **k: sent.append(a) or "unreachable"  # type: ignore[assignment]
+        try:
+            with self.assertRaises(S.TranscriptTooLong):
+                S.summarize("x" * 5_000_000, base_url=self.url, model="m1")
+        finally:
+            llm.call = original  # type: ignore[assignment]
+        self.assertEqual(sent, [])
+
+    def test_error_says_nothing_was_sent(self) -> None:
+        with self.assertRaises(S.TranscriptTooLong) as cm:
+            S.build_prompt("x" * 200_000, 12, budget=24_000)
+        self.assertIn("Nothing was sent", str(cm.exception))
+
+    def test_within_budget_is_untouched(self) -> None:
+        text = "w " * 1000
+        prompt, trimmed = S.build_prompt(text, 12, budget=24_000)
+        self.assertFalse(trimmed)
+        self.assertIn(text.strip(), prompt)
 
 
 class TestCall(Base):
@@ -423,7 +458,7 @@ class TestThinEvidence(unittest.TestCase):
     def test_thin_output_is_not_padded_to_the_budget(self) -> None:
         # The instruction has to survive a long transcript, since budget_for
         # asks for many bullets; thin evidence must override that.
-        prompt, _ = S.build_prompt("word " * 5000)
+        prompt, _ = S.build_prompt("word " * 5000, budget=10**6)
         self.assertIn("Do not pad to reach the bullet budget", prompt)
 
     def test_absent_and_broken_transcripts_are_distinguished(self) -> None:
@@ -461,6 +496,37 @@ class TestBudget(unittest.TestCase):
     def test_ceiling_still_applies(self) -> None:
         n, _ = S.budget_for("w " * 50_000, ceiling=12)
         self.assertEqual(n, 12)
+
+    def test_word_cap_scales_with_bullets_not_transcript_length(self) -> None:
+        """12 bullets is a fixed ask, so it gets a fixed word budget.
+
+        A 26k-word transcript used to ask for 2,678 words -- an essay about a
+        document whose middle had been trimmed away. It now asks for
+        12 x SUMMARY_MAX_WORDS_PER_BULLET.
+        """
+        _, cap_26k = S.budget_for("w " * 26_788)
+        _, cap_10k = S.budget_for("w " * 10_000)
+        _, cap_80k = S.budget_for("w " * 80_000)
+        self.assertEqual(cap_26k, 12 * St.SUMMARY_MAX_WORDS_PER_BULLET)
+        self.assertEqual(cap_10k, cap_26k)
+        self.assertEqual(cap_80k, cap_26k)
+
+    def test_word_cap_follows_a_reduced_bullet_count(self) -> None:
+        n, cap = S.budget_for("w " * 26_788, ceiling=6)
+        self.assertEqual(n, 6)
+        self.assertEqual(cap, 6 * St.SUMMARY_MAX_WORDS_PER_BULLET)
+
+    def test_short_transcript_budget_is_unchanged_by_the_cap(self) -> None:
+        """The cap bites only where the ratio exceeds it; a short video keeps
+        the word target it already had."""
+        _, cap = S.budget_for("w " * 3_600)
+        self.assertEqual(cap, 360)
+        self.assertLess(cap, 12 * St.SUMMARY_MAX_WORDS_PER_BULLET)
+
+    def test_word_cap_exceeds_a_typical_bullet(self) -> None:
+        """Median corpus bullet is ~30 words, p90 38. The cap has to leave room
+        for a long one or it would force clipped bullets."""
+        self.assertGreaterEqual(St.SUMMARY_MAX_WORDS_PER_BULLET, 38)
 
     def test_word_target_is_in_the_prompt(self) -> None:
         p, _ = S.build_prompt("w " * 1000)
@@ -506,7 +572,7 @@ class TestBuildPrompt(unittest.TestCase):
         # --bullets is a ceiling. A short transcript is not worth 7 bullets and
         # the prompt says so, instead of asking for padding.
         short, _ = S.build_prompt("word " * 100, 7)
-        long, _ = S.build_prompt("word " * 5000, 7)
+        long, _ = S.build_prompt("word " * 5000, 7, 10**6)
         self.assertIn("At most 4 content bullets", short)
         self.assertIn("At most 7 content bullets", long)
 
@@ -518,9 +584,12 @@ class TestSummarize(Base):
         self.assertEqual(bullets, "- Erster Punkt\n- Zweiter Punkt")
 
     def test_prompt_contains_budget_and_transcript(self) -> None:
-        S.summarize(
-            "UNIQUE_MARKER " * 5000, base_url=self.url, model="m1", max_bullets=7
-        )
+        # A wide context window, as a real endpoint advertises, so the whole
+        # transcript is sent rather than refused.
+        with mock.patch.object(S.llm, "context_limit", return_value=1_000_000):
+            S.summarize(
+                "UNIQUE_MARKER " * 5000, base_url=self.url, model="m1", max_bullets=7
+            )
         sent = LAST["body"]["messages"][0]["content"]
         self.assertIn("At most 7 content bullets", sent)
         self.assertIn("UNIQUE_MARKER", sent)
@@ -735,7 +804,7 @@ class TestPromptAsData(unittest.TestCase):
         self.assertEqual(named - supplied, set(), "placeholder with no keyword")
         self.assertEqual(supplied - named, set(), "keyword never placeholdered")
         # And it really formats, with the documented keys.
-        S.build_prompt("word " * 100, 8, 4000, title="t", channel="c", description="d")
+        S.build_prompt("word " * 100, 8, 10**6, title="t", channel="c", description="d")
 
     def test_bench_classification_is_not_in_the_shipped_prompt(self) -> None:
         """A reader never needs the model to label its own work.

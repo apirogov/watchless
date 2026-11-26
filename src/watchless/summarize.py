@@ -15,15 +15,18 @@ from watchless import llm
 from watchless.llm import SummarizeError, call, resolve
 from watchless.log import debug
 from watchless.settings import (
-    DEFAULT_MAX_BULLETS as MAX_BULLETS,
-)
-from watchless.settings import (
+    CHARS_PER_TOKEN,
+    CONTEXT_FRACTION,
     DEFAULT_MAX_CHARS,
     DESC_MAX_CHARS,
     SUMMARY_FLOOR_BULLETS,
+    SUMMARY_MAX_WORDS_PER_BULLET,
     SUMMARY_TARGET_RATIO,
     SUMMARY_WORDS_PER_BULLET,
     TIMEOUT_S,
+)
+from watchless.settings import (
+    DEFAULT_MAX_BULLETS as MAX_BULLETS,
 )
 
 # The public surface is the prompt/summary pair. ``call``/``resolve``/
@@ -36,13 +39,13 @@ __all__ = [
     "PROMPT",
     "TIMEOUT_S",
     "SummarizeError",
+    "TranscriptTooLong",
     "budget_for",
     "build_prompt",
     "call",
     "normalize_bullets",
     "resolve",
     "summarize",
-    "trim",
 ]
 
 # --------------------------------------------------------------------------
@@ -61,41 +64,46 @@ PROMPT = _PROMPTS.joinpath("summarize.md").read_text(encoding="utf-8")
 KIND_PROMPT = _PROMPTS.joinpath("kind.md").read_text(encoding="utf-8")
 
 
-def trim(text: str, max_chars: int = DEFAULT_MAX_CHARS) -> tuple[str, bool]:
-    """Keep head and tail, drop the middle. Returns (text, was_trimmed)."""
-    if len(text) <= max_chars:
-        return text, False
-    half = max_chars // 2
-    return (
-        text[:half]
-        + "\n\n[... middle of transcript omitted for length ...]\n\n"
-        + text[-half:],
-        True,
-    )
+def fits(text: str, budget: int) -> bool:
+    """Is this transcript within the character budget?"""
+    return len(text) <= budget
 
 
 def budget_for(text: str, ceiling: int = MAX_BULLETS) -> tuple[int, int]:
     """Bullet count and word target for this transcript.
 
-    A flat ceiling ignores how much there is to summarise: it is generous on a
-    short video and punishing on a long one. Scale with the transcript instead,
-    but never below SUMMARY_FLOOR_BULLETS -- a 450-word stand-up set summarised
-    at a literal 10% is two bullets, which is not a summary of anything.
+    A flat bullet count ignores how much there is to summarise: it is generous
+    on a short video and punishing on a long one. Scale with the transcript, but
+    never below SUMMARY_FLOOR_BULLETS -- a 450-word stand-up set summarised at a
+    literal 10% is two bullets, which is not a summary of anything. Never above
+    SUMMARY_MAX_WORDS_PER_BULLET per bullet either, so the word target tracks the
+    number of bullets rather than the length of a transcript.
 
     Returns (bullets, words) where words includes only the content bullets; the
-    TL;DR and the Trust line are outside the budget.
+    TL;DR and the Assessment are outside the budget.
     """
     tr = SUMMARY_TARGET_RATIO
     per = SUMMARY_WORDS_PER_BULLET
     words = int(len(text.split()) * tr)
     n = max(SUMMARY_FLOOR_BULLETS, min(ceiling, round(words / per)))
-    return n, max(words, n * per // 2)
+    return n, max(min(words, n * SUMMARY_MAX_WORDS_PER_BULLET), n * per // 2)
+
+
+def budget_chars(context_tokens: int | None) -> int:
+    """Characters of transcript we are willing to send.
+
+    Half the model's context window when the endpoint advertises one, so the
+    summary and its reasoning have room; otherwise a conservative constant.
+    """
+    if context_tokens:
+        return int(context_tokens * CONTEXT_FRACTION) * CHARS_PER_TOKEN
+    return DEFAULT_MAX_CHARS
 
 
 def build_prompt(
     text: str,
     max_bullets: int = MAX_BULLETS,
-    max_chars: int = DEFAULT_MAX_CHARS,
+    budget: int | None = None,
     *,
     title: str | None = None,
     channel: str | None = None,
@@ -111,7 +119,14 @@ def build_prompt(
     off by default because a reader never needs the model to label its own work,
     and asking costs tokens and invites the model to explain itself.
     """
-    body, trimmed = trim(text, max_chars)
+    limit = budget if budget is not None else budget_chars(None)
+    if not fits(text, limit):
+        raise TranscriptTooLong(
+            f"transcript is {len(text):,} characters, over the {limit:,} "
+            f"budget (~{limit // CHARS_PER_TOKEN:,} tokens). Nothing was sent. "
+            f"This video is too long to summarise on this endpoint; the "
+            f"transcript was still written."
+        )
     desc = (description or "").strip()
     if len(desc) > DESC_MAX_CHARS:
         desc = desc[:DESC_MAX_CHARS] + "\n[... description truncated for length ...]"
@@ -123,8 +138,12 @@ def build_prompt(
         title=(title or "").strip() or "(none provided)",
         channel=(channel or "").strip() or "(none provided)",
         description=desc or "(none provided)",
-        text=body,
-    ), trimmed
+        text=text,
+    ), False
+
+
+class TranscriptTooLong(SummarizeError):
+    """The transcript does not fit the budget. Nothing was sent."""
 
 
 # "[fact]" promises verification this tool cannot perform: every assertion the
@@ -251,7 +270,6 @@ def summarize(
     api_key: str | None = None,
     model: str | None = None,
     max_bullets: int = MAX_BULLETS,
-    max_chars: int = DEFAULT_MAX_CHARS,
     timeout: int = TIMEOUT_S,
     retries: int = 0,
     *,
@@ -267,12 +285,20 @@ def summarize(
     that wants to score it can, and the file never shows it.
     """
     # resolve once so the preflight and the request use identical values
-    _, _, resolved_model = llm.resolve(base_url, api_key, model)
+    r_base, r_key, resolved_model = llm.resolve(base_url, api_key, model)
     llm.preflight(base_url, api_key, resolved_model)
+    # The transcript budget comes from the endpoint's own context window, so a
+    # long video is not cut down to a fixed constant chosen for a 2024 laptop.
+    ctx = llm.context_limit(resolved_model, r_base, r_key)
+    budget = budget_chars(ctx)
+    debug(
+        f"context {'unknown' if ctx is None else f'{ctx:,} tokens'}"
+        f" -> transcript budget {budget:,} chars"
+    )
     prompt, trimmed = build_prompt(
         text,
         max_bullets,
-        max_chars,
+        budget,
         title=title,
         channel=channel,
         description=description,

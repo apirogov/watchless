@@ -285,19 +285,17 @@ class TestVideoId(unittest.TestCase):
 class TestSummaryShape(unittest.TestCase):
     def test_bullet_budget_in_prompt(self) -> None:
         # Long enough to reach the ceiling, so the ceiling is what lands.
-        prompt, _ = S.build_prompt("word " * 5000, max_bullets=7)
+        prompt, _ = S.build_prompt("word " * 5000, max_bullets=7, budget=10**6)
         self.assertIn("At most 7 content bullets", prompt)
 
     def test_normalise_and_cap(self) -> None:
         raw = "\n".join(f"- p{i}" for i in range(20))
         self.assertEqual(len(S.normalize_bullets(raw, 5).splitlines()), 5)
 
-    def test_trim_keeps_ends(self) -> None:
-        text = "A" * 100 + "B" * 100
-        trimmed, was = S.trim(text, 40)
-        self.assertTrue(was)
-        self.assertTrue(trimmed.startswith("A"))
-        self.assertTrue(trimmed.endswith("B"))
+    def test_over_budget_transcript_is_refused(self) -> None:
+        """No middle is cut out: an over-budget transcript is refused outright."""
+        with self.assertRaises(S.TranscriptTooLong):
+            S.build_prompt("A" * 100 + "B" * 100, budget=40)
 
 
 # ---------------------------------------------------------------- failures
