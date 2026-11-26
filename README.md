@@ -110,7 +110,7 @@ watchless [URL] [-o FILE | --out-dir DIR]
        [--description | --no-description] [--timestamps | --no-timestamps]
        [--sleep-subtitles SEC]
        [--llm-url URL] [--llm-key TOKEN] [--llm-model NAME]
-       [--bullets N] [--llm-timeout SEC] [--max-chars N]
+       [--bullets N] [--llm-timeout SEC] [--llm-retries N] [--max-chars N]
        [--summary | --no-summary]
        [--install-termux-opener] [--force]
        [--doctor] [--version]
@@ -136,7 +136,8 @@ The path of the written file goes to **stdout**; everything else goes to
 | `--llm-url URL` | enable summaries |
 | `--llm-key`, `--llm-model` | auth token, model name |
 | `--bullets N` | ceiling on summary lines; the budget scales with the transcript |
-| `--llm-timeout SEC` | how long to wait for the endpoint (default 300) |
+| `--llm-timeout SEC` | how long to wait for one answer (default 300) |
+| `--llm-retries N` | extra attempts on a 5xx or connection error, timeout each (default 0) |
 | `--max-chars N` | trim transcripts longer than N before summarising (default 24000) |
 | `--summary` | require a summary: exit 4 instead of silently skipping |
 | `--no-summary` | skip it even when an endpoint is configured |
@@ -234,7 +235,9 @@ an on-device model) and you have the text either way.
 
 **No summary appears.** Run `--doctor`: it reports what was resolved and why the
 endpoint did or did not answer. A large model cold-loading can exceed the 300s
-default; raise `--llm-timeout`.
+default; raise `--llm-timeout`. The timeout is per attempt, so the total wait is
+`(1 + --llm-retries) * --llm-timeout` — with the default `--llm-retries 0` that
+is simply the timeout you asked for.
 
 ---
 

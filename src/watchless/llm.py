@@ -327,13 +327,19 @@ def call(
     api_key: str | None = None,
     model: str | None = None,
     timeout: int = TIMEOUT_S,
-    retries: int = 2,
+    retries: int = 0,
 ) -> str:
-    """POST the prompt. Retries once on transient (5xx / connection) errors."""
+    """POST the prompt, retrying transient errors up to ``retries`` extra times.
+
+    ``timeout`` is per attempt, so the worst case is ``(retries + 1) * timeout``
+    plus the sleeps between attempts. The default of 0 means one attempt: a
+    timeout is the budget being spent, and a second identical wait rarely helps
+    a model that is still loading.
+    """
     import time  # noqa: PLC0415
 
     last: Exception | None = None
-    for attempt in range(retries):
+    for attempt in range(retries + 1):
         t0 = time.monotonic()
         try:
             out = _post_once(prompt, base_url, api_key, model, timeout)
@@ -341,11 +347,12 @@ def call(
             return out
         except _Transient as e:
             last = e
-            if attempt + 1 < retries:
-                from watchless.log import log  # noqa: PLC0415
+            if attempt >= retries:
+                break
+            from watchless.log import log  # noqa: PLC0415
 
-                log(f"warning: {e}; retrying ({attempt + 2}/{retries})")
-                time.sleep(1.5 * (attempt + 1))
+            log(f"warning: {e}; retrying ({attempt + 2}/{retries + 1})")
+            time.sleep(1.5 * (attempt + 1))
         except KeyboardInterrupt:
             # Ctrl-C during a blocking connect: not a crash, just stop.
             from watchless.log import log  # noqa: PLC0415

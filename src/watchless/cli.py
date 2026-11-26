@@ -463,7 +463,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=settings.TIMEOUT_S,
         metavar="SEC",
-        help="how long to wait for the endpoint (default 300)",
+        help="how long to wait for one answer from the endpoint (default 300)",
+    )
+    group.add_argument(
+        "--llm-retries",
+        type=int,
+        default=settings.RETRIES,
+        metavar="N",
+        help="extra attempts on a 5xx or connection error; the timeout "
+        "applies to each (default 0)",
     )
     group.add_argument(
         "--max-chars",
@@ -629,6 +637,7 @@ def _summarize_or_degrade(
             max_bullets=args.bullets,
             max_chars=args.max_chars,
             timeout=args.llm_timeout,
+            retries=args.llm_retries,
             title=video.title,
             channel=video.channel,
             description=video.description,

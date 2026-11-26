@@ -17,6 +17,7 @@ from pathlib import Path
 
 # Declared once. Everything that needs a default imports it from here.
 TIMEOUT_S = 300  # local models on weak hardware are slow
+RETRIES = 0  # attempts beyond the first; the timeout applies to each
 DEFAULT_MAX_CHARS = 24_000  # ~6k tokens; trimmed from the middle if longer
 DEFAULT_MAX_BULLETS = 12
 # Budget shaping. A fixed bullet ceiling compresses a 3,800-word transcript far

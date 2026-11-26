@@ -361,6 +361,18 @@ class TestCall(Base):
             )
         self.assertIn("cannot reach", str(cm.exception))
 
+    def test_default_is_a_single_attempt(self) -> None:
+        """retries defaults to 0, so one 5xx ends the run immediately.
+
+        The default used to be 2, which made --llm-timeout 300 wait 600s before
+        giving up -- long enough to look hung on a phone.
+        """
+        MODE["v"] = "500"
+        FORCED["tries"] = 0
+        with self.assertRaises(llm.SummarizeError):
+            llm.call("P", base_url=self.url, model="m1")
+        self.assertEqual(FORCED["tries"], 0)
+
 
 class TestRobustness(Base):
     def test_content_parts_shape(self) -> None:
@@ -388,7 +400,7 @@ class TestRobustness(Base):
 
     def test_transient_500_is_retried_then_succeeds(self) -> None:
         MODE["v"] = "fail_then_ok"
-        out = S.call("P", base_url=self.url, model="m1")
+        out = S.call("P", base_url=self.url, model="m1", retries=1)
         self.assertIn("Erster Punkt", out)
         self.assertEqual(FORCED["tries"], 2)
 

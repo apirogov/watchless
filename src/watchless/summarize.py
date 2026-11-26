@@ -253,6 +253,7 @@ def summarize(
     max_bullets: int = MAX_BULLETS,
     max_chars: int = DEFAULT_MAX_CHARS,
     timeout: int = TIMEOUT_S,
+    retries: int = 0,
     *,
     title: str | None = None,
     channel: str | None = None,
@@ -282,7 +283,7 @@ def summarize(
     )
     debug(f"prompt {len(prompt)} chars -> {max_bullets} bullets max")
     return normalize_bullets(
-        llm.call(prompt, base_url, api_key, model, timeout=timeout),
+        llm.call(prompt, base_url, api_key, model, timeout=timeout, retries=retries),
         max_bullets,
         kind_out=kind_out,
     ), trimmed
