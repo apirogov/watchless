@@ -1,5 +1,10 @@
 # watchless
 
+[![PyPI version](https://img.shields.io/pypi/v/watchless)](https://pypi.org/project/watchless/)
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/watchless)](https://pypi.org/project/watchless/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Typed: mypy](https://img.shields.io/badge/typed-mypy-blue)](pyproject.toml)
+
 YouTube URL in, a readable Markdown document out: the video's transcript as
 prose, and — with an LLM endpoint configured — a summary of what it claims and
 how far to trust it.
@@ -110,7 +115,7 @@ watchless [URL] [-o FILE | --out-dir DIR]
        [--description | --no-description] [--timestamps | --no-timestamps]
        [--sleep-subtitles SEC]
        [--llm-url URL] [--llm-key TOKEN] [--llm-model NAME]
-       [--bullets N] [--llm-timeout SEC] [--llm-retries N] [--max-chars N]
+       [--bullets N] [--llm-timeout SEC] [--llm-retries N]
        [--summary | --no-summary]
        [--install-termux-opener] [--force]
        [--doctor] [--version]
@@ -135,10 +140,9 @@ The path of the written file goes to **stdout**; everything else goes to
 | `--sleep-subtitles SEC` | pause before the caption request (default 1); raise it if you hit 429s |
 | `--llm-url URL` | enable summaries |
 | `--llm-key`, `--llm-model` | auth token, model name |
-| `--bullets N` | ceiling on summary lines; the budget scales with the transcript |
+| `--bullets N` | ceiling on summary lines; each bullet gets a fixed word budget |
 | `--llm-timeout SEC` | how long to wait for one answer (default 300) |
 | `--llm-retries N` | extra attempts on a 5xx or connection error, timeout each (default 0) |
-| `--max-chars N` | trim transcripts longer than N before summarising (default 24000) |
 | `--summary` | require a summary: exit 4 instead of silently skipping |
 | `--no-summary` | skip it even when an endpoint is configured |
 | `--doctor` | report resolved config and test the endpoint, then exit |
@@ -233,6 +237,12 @@ Do not add cookies: authenticating around a block risks a permanent account ban.
 speech recognition. Transcribe the audio separately (`yt-dlp -x`, then whisper or
 an on-device model) and you have the text either way.
 
+**The summary is refused as too long.** How much of a video fits is the
+endpoint's context window, read from `GET /models`. A transcript past half of it
+is refused rather than cut: the error says so, nothing is sent, and the
+transcript is still written. Use a model with a larger window, or transcribe in
+parts.
+
 **No summary appears.** Run `--doctor`: it reports what was resolved and why the
 endpoint did or did not answer. A large model cold-loading can exceed the 300s
 default; raise `--llm-timeout`. The timeout is per attempt, so the total wait is
@@ -278,6 +288,6 @@ export WATCHLESS_BASE_URL=http://192.168.1.10:8080/v1
 export WATCHLESS_MODEL=qwen3-8b
 ```
 
-> **`export` is required.** A bare `WATCHLESS_MODEL=...` stays a shell variable and
-> the Python child never sees it.
+**`export` is required.** A bare `WATCHLESS_MODEL=...` stays a shell variable and
+the Python child never sees it.
 
