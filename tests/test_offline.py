@@ -282,7 +282,7 @@ class TestVideoId:
 class TestSummaryShape:
     def test_bullet_budget_in_prompt(self) -> None:
         # Long enough to reach the ceiling, so the ceiling is what lands.
-        prompt, _ = S.build_prompt("word " * 5000, max_bullets=7, budget=10**6)
+        prompt = S.build_prompt("word " * 5000, max_bullets=7, budget=10**6)
         assert "At most 7 content bullets" in prompt
 
     def test_normalise_and_cap(self) -> None:
@@ -770,7 +770,7 @@ class TestMetadataCost:
             ),
             mock.patch(
                 "watchless.summarize.summarize",
-                return_value=("CASE A - x\n- a point", False),
+                return_value="CASE A - x\n- a point",
             ),
         ):
             # --llm-url makes it a summarising run, so the description is

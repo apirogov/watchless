@@ -109,7 +109,7 @@ def build_prompt(
     channel: str | None = None,
     description: str | None = None,
     classify: bool = False,
-) -> tuple[str, bool]:
+) -> str:
     """Assemble the request.
 
     Title, channel and description are separate labelled fields, never glued
@@ -139,7 +139,7 @@ def build_prompt(
         channel=(channel or "").strip() or "(none provided)",
         description=desc or "(none provided)",
         text=text,
-    ), False
+    )
 
 
 class TranscriptTooLong(SummarizeError):
@@ -277,8 +277,8 @@ def summarize(
     channel: str | None = None,
     description: str | None = None,
     kind_out: list[str] | None = None,
-) -> tuple[str, bool]:
-    """Returns (summary, was_trimmed).
+) -> str:
+    """Returns the summary.
 
     ``kind_out``, when given, receives the model's classification ("A" / "B" /
     "BOTH"). It is stripped from the returned text either way, so the caller
@@ -295,7 +295,7 @@ def summarize(
         f"context {'unknown' if ctx is None else f'{ctx:,} tokens'}"
         f" -> transcript budget {budget:,} chars"
     )
-    prompt, trimmed = build_prompt(
+    prompt = build_prompt(
         text,
         max_bullets,
         budget,
@@ -312,4 +312,4 @@ def summarize(
         llm.call(prompt, base_url, api_key, model, timeout=timeout, retries=retries),
         max_bullets,
         kind_out=kind_out,
-    ), trimmed
+    )

@@ -620,7 +620,7 @@ def _summarize_or_degrade(
         + f", timeout {args.llm_timeout}s ..."
     )
     try:
-        summary, was_trimmed = summarise(
+        summary = summarise(
             text,
             base_url=llm_url,
             api_key=llm_key,
@@ -643,10 +643,7 @@ def _summarize_or_degrade(
         log(f"summary failed: {exc}")
         return None
 
-    log(
-        f"summary: {len(summary.splitlines())} lines"
-        + (" (transcript was trimmed)" if was_trimmed else "")
-    )
+    log(f"summary: {len(summary.splitlines())} lines")
     return summary
 
 

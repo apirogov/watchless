@@ -336,8 +336,7 @@ class TestRefusesRatherThanTruncates:
 
     def test_within_budget_is_untouched(self) -> None:
         text = "w " * 1000
-        prompt, trimmed = S.build_prompt(text, 12, budget=24_000)
-        assert not trimmed
+        prompt = S.build_prompt(text, 12, budget=24_000)
         assert text.strip() in prompt
 
 
@@ -455,18 +454,18 @@ class TestThinEvidence:
     """ "Not enough to work with" is an outcome, not a failure."""
 
     def test_prompt_names_thin_evidence_as_a_valid_outcome(self) -> None:
-        prompt, _ = S.build_prompt("word " * 500)
+        prompt = S.build_prompt("word " * 500)
         assert "THIN EVIDENCE" in prompt
         assert "is a real and common outcome, not a" in prompt
 
     def test_thin_output_is_not_padded_to_the_budget(self) -> None:
         # The instruction has to survive a long transcript, since budget_for
         # asks for many bullets; thin evidence must override that.
-        prompt, _ = S.build_prompt("word " * 5000, budget=10**6)
+        prompt = S.build_prompt("word " * 5000, budget=10**6)
         assert "Do not pad to reach the bullet budget" in prompt
 
     def test_absent_and_broken_transcripts_are_distinguished(self) -> None:
-        prompt, _ = S.build_prompt("word " * 500)
+        prompt = S.build_prompt("word " * 500)
         assert "BROKEN transcript" in prompt
         assert "ABSENT or empty one" in prompt
 
@@ -533,7 +532,7 @@ class TestBudget:
         assert St.SUMMARY_MAX_WORDS_PER_BULLET >= 38
 
     def test_word_target_is_in_the_prompt(self) -> None:
-        p, _ = S.build_prompt("w " * 1000)
+        p = S.build_prompt("w " * 1000)
         assert "about 100 words" in p
 
 
@@ -541,14 +540,13 @@ class TestBuildPrompt:
     """Title/description are separate labelled fields, never glued to {text}."""
 
     def test_metadata_in_own_fields(self) -> None:
-        p, trimmed = S.build_prompt(
+        p = S.build_prompt(
             "SPEECH_ONLY",
             6,
             title="My Title",
             channel="My Channel",
             description="https://example.org/paper",
         )
-        assert not trimmed
         assert "TITLE: My Title" in p
         assert "CHANNEL: My Channel" in p
         assert "https://example.org/paper" in p
@@ -559,7 +557,7 @@ class TestBuildPrompt:
         assert "My Title" not in body
 
     def test_absent_values_are_marked(self) -> None:
-        p, _ = S.build_prompt("t", 12)
+        p = S.build_prompt("t", 12)
         assert "TITLE: (none provided)" in p
         assert "CHANNEL: (none provided)" in p
         assert "(none provided)" in p
@@ -568,23 +566,22 @@ class TestBuildPrompt:
         # Assert the description was cut to its own cap, not that the whole
         # prompt fits a fixed number: the prompt text is edited often, and a
         # magic total failed every time a rule was added to it.
-        p, _ = S.build_prompt("t", 12, description="D" * 10000)
+        p = S.build_prompt("t", 12, description="D" * 10000)
         assert "description truncated" in p
         assert p.count("D" * 10) < 10000 // 10
 
     def test_budget_is_derived_from_length_not_copied(self) -> None:
         # --bullets is a ceiling. A short transcript is not worth 7 bullets and
         # the prompt says so, instead of asking for padding.
-        short, _ = S.build_prompt("word " * 100, 7)
-        long, _ = S.build_prompt("word " * 5000, 7, 10**6)
+        short = S.build_prompt("word " * 100, 7)
+        long = S.build_prompt("word " * 5000, 7, 10**6)
         assert "At most 4 content bullets" in short
         assert "At most 7 content bullets" in long
 
 
 class TestSummarize:
     def test_end_to_end(self, mock_url: str) -> None:
-        bullets, trimmed = S.summarize("some transcript", base_url=mock_url, model="m1")
-        assert not trimmed
+        bullets = S.summarize("some transcript", base_url=mock_url, model="m1")
         assert bullets == "- Erster Punkt\n- Zweiter Punkt"
 
     def test_prompt_contains_budget_and_transcript(self, mock_url: str) -> None:
@@ -687,12 +684,12 @@ class TestModelField:
 
     def test_preflight_accepts_known_model(self, mock_url: str) -> None:
         FORCED["models"] = ["qwen3-8b"]
-        bullets, _ = S.summarize("text", base_url=mock_url, model="qwen3-8b")
+        bullets = S.summarize("text", base_url=mock_url, model="qwen3-8b")
         assert bullets.startswith("- ")
 
     def test_preflight_skipped_when_no_models_endpoint(self, mock_url: str) -> None:
         FORCED["models"] = None  # 404 on /models
-        bullets, _ = S.summarize("text", base_url=mock_url, model="anything")
+        bullets = S.summarize("text", base_url=mock_url, model="anything")
         assert bullets.startswith("- ")
 
 
@@ -817,8 +814,8 @@ class TestPromptAsData:
         assert "KIND" in S.KIND_PROMPT
 
     def test_classify_flag_appends_the_bench_instruction(self) -> None:
-        plain, _ = S.build_prompt("word " * 100)
-        scored, _ = S.build_prompt("word " * 100, classify=True)
+        plain = S.build_prompt("word " * 100)
+        scored = S.build_prompt("word " * 100, classify=True)
         assert "KIND" not in plain
         assert "KIND" in scored
         assert scored.startswith(plain.rstrip())
